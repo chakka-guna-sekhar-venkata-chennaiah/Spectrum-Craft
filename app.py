@@ -126,7 +126,6 @@ if page == "About":
 
 elif page == "How to Use":
     st.header("How to Use SpectrumCraft")
-    st.write("Watch the tutorial video below to learn how to use SpectrumCraft:")
     
     # Add your .mov file here
     st.video("reference.mov")
