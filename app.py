@@ -126,9 +126,9 @@ if page == "About":
 
 elif page == "How to Use":
     st.write("Watch the tutorial video below to learn how to use SpectrumCraft:")
-    
-    # Add your .mov file here
-    st.video("reference.mov")
+    video_file = open("reference.mp4", "rb")
+    video_bytes = video_file.read()
+    st.video(video_bytes)
     
     st.write("""
     1. Upload an image using the file uploader
