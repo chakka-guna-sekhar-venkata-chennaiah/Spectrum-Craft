@@ -106,7 +106,6 @@ st.markdown(f'<p class="sub-heading">Custom Filters & Frequency Tuning</p>', uns
 page = st.sidebar.selectbox("Choose a page", ["About", "How to Use", "Main Application"])
 
 if page == "About":
-    st.header("About SpectrumCraft")
     st.write("""
     SpectrumCraft is a powerful web application designed for image processing enthusiasts, 
     researchers, and students interested in exploring the fascinating world of frequency domain 
@@ -130,7 +129,7 @@ elif page == "How to Use":
     st.write("Watch the tutorial video below to learn how to use SpectrumCraft:")
     
     # Add your .mov file here
-    st.video("path_to_your_tutorial_video.mov")
+    st.video("reference.mov")
     
     st.write("""
     1. Upload an image using the file uploader
