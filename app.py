@@ -141,90 +141,87 @@ elif page == "How to Use":
 elif page == "Main Application":
     st.header("SpectrumCraft Main Application")
     
-    # Define allowed file formats
-    ALLOWED_EXTENSIONS = ["png", "jpg", "jpeg"]
-    
-    uploaded_file = st.file_uploader("Choose an image...", type=ALLOWED_EXTENSIONS)
+    @st.cache_data
+    def apply_bandpass_filter_cached(spectrum, low_freq, high_freq):
+        filtered_spectrum = apply_bandpass_filter(spectrum, low_freq, high_freq)
+        freq_filtered_image = reconstruct_image(filtered_spectrum)
+        return freq_filtered_image
+
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
 
     if uploaded_file is not None:
-        file_extension = uploaded_file.name.split(".")[-1].lower()
-        if file_extension not in ALLOWED_EXTENSIONS:
-            st.warning(f"Unsupported file format. Please upload a PNG, JPG, or JPEG image.")
-        else:
-            image_bytes = uploaded_file.read()
-            original_image = process_image(image_bytes)
-            spectrum = compute_spectrum(original_image)
+        image_bytes = uploaded_file.read()
+        original_image = process_image(image_bytes)
+        spectrum = compute_spectrum(original_image)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            small_subheader("Original Image")
+            st.image(original_image, use_column_width=True)
+            st.caption(f"Memory usage: {get_file_size(original_image):.2f} KB")
+
+        with col2:
+            small_subheader("Magnitude Spectrum")
+            fig = plot_spectrum(spectrum)
+            st.pyplot(fig)
+
+        with col3:
+            small_subheader("Reconstructed Image")
+            reconstructed = reconstruct_image(spectrum)
+            st.image(reconstructed, use_column_width=True)
+            st.caption(f"Memory usage: {get_file_size(reconstructed):.2f} KB")
+
+        st.info("""
+            **Note on Reconstruction:**
+            When reconstructing the image using all frequencies, you may notice some noise or slight differences compared to the original image. 
+            This is due to:
+            1. Numerical precision limitations in computations
+            2. Rounding errors in the Fourier transform and inverse transform processes
+            3. Potential loss of information in the phase component
             
-            col1, col2, col3 = st.columns(3)
+            These factors can introduce small artifacts or noise in the reconstructed image, even when using all available frequency information.
+            """)
+        col1, col2 = st.columns(2)
+
+        with col1:
+            small_subheader("Spatial Domain Filter")
+            filter_size = st.slider("Filter Size", min_value=3, max_value=15, value=7, step=2)
+            st.write("Editable Filter Matrix")
+            filter_matrix = np.ones((filter_size, filter_size))
+            filter_df = pd.DataFrame(filter_matrix)
+            edited_filter_df = st.data_editor(filter_df, num_rows="dynamic")
             
-            with col1:
-                small_subheader("Original Image")
-                st.image(original_image, use_column_width=True)
-                st.caption(f"Memory usage: {get_file_size(original_image):.2f} KB")
-
-            with col2:
-                small_subheader("Magnitude Spectrum")
-                fig = plot_spectrum(spectrum)
-                st.pyplot(fig)
-
-            with col3:
-                small_subheader("Reconstructed Image")
-                reconstructed = reconstruct_image(spectrum)
-                st.image(reconstructed, use_column_width=True)
-                st.caption(f"Memory usage: {get_file_size(reconstructed):.2f} KB")
-
-            st.info("""
-                **Note on Reconstruction:**
-                When reconstructing the image using all frequencies, you may notice some noise or slight differences compared to the original image. 
-                This is due to:
-                1. Numerical precision limitations in computations
-                2. Rounding errors in the Fourier transform and inverse transform processes
-                3. Potential loss of information in the phase component
+            if st.button("Apply Spatial Filter"):
+                edited_filter = edited_filter_df.to_numpy()
+                full_size_filter = np.zeros_like(original_image, dtype=float)
+                center = np.array(full_size_filter.shape) // 2
+                start = center - np.array(edited_filter.shape) // 2
+                end = start + np.array(edited_filter.shape)
+                full_size_filter[start[0]:end[0], start[1]:end[1]] = edited_filter
                 
-                These factors can introduce small artifacts or noise in the reconstructed image, even when using all available frequency information.
-                """)
-            col1, col2 = st.columns(2)
-
-            with col1:
-                small_subheader("Spatial Domain Filter")
-                filter_size = st.slider("Filter Size", min_value=3, max_value=15, value=7, step=2)
-                st.write("Editable Filter Matrix")
-                filter_matrix = np.ones((filter_size, filter_size))
-                filter_df = pd.DataFrame(filter_matrix)
-                edited_filter_df = st.data_editor(filter_df, num_rows="dynamic")
+                filtered_spectrum = spectrum * full_size_filter
+                spatial_filtered_image = reconstruct_image(filtered_spectrum)
                 
-                if st.button("Apply Spatial Filter"):
-                    edited_filter = edited_filter_df.to_numpy()
-                    full_size_filter = np.zeros_like(original_image, dtype=float)
-                    center = np.array(full_size_filter.shape) // 2
-                    start = center - np.array(edited_filter.shape) // 2
-                    end = start + np.array(edited_filter.shape)
-                    full_size_filter[start[0]:end[0], start[1]:end[1]] = edited_filter
-                    
-                    filtered_spectrum = spectrum * full_size_filter
-                    spatial_filtered_image = reconstruct_image(filtered_spectrum)
-                    
-                    st.session_state.spatial_filtered_image = spatial_filtered_image
-                    st.session_state.spatial_original_size = get_file_size(original_image)
-                    st.session_state.spatial_new_size = get_file_size(spatial_filtered_image)
+                st.session_state.spatial_filtered_image = spatial_filtered_image
+                st.session_state.spatial_original_size = get_file_size(original_image)
+                st.session_state.spatial_new_size = get_file_size(spatial_filtered_image)
 
-                if 'spatial_filtered_image' in st.session_state:
-                    st.subheader("Spatially Filtered Image")
-                    st.image(st.session_state.spatial_filtered_image, use_column_width=True)
-                    st.write(f"Original size: {st.session_state.spatial_original_size:.2f} KB")
-                    st.write(f"New size (after spatial filtering): {st.session_state.spatial_new_size:.2f} KB")
+            if 'spatial_filtered_image' in st.session_state:
+                st.subheader("Spatially Filtered Image")
+                st.image(st.session_state.spatial_filtered_image, use_column_width=True)
+                st.write(f"Original size: {st.session_state.spatial_original_size:.2f} KB")
+                st.write(f"New size (after spatial filtering): {st.session_state.spatial_new_size:.2f} KB")
 
-            with col2:
-                small_subheader("Frequency Domain Filter")
-                st.write("Custom Frequency Range (Bandpass)")
-                low_freq, high_freq = st.slider("Frequency Range", 0.0, 1.0, (0.0, 1.0), 0.01)
-                
-                # Apply frequency filter
-                freq_filtered_image = apply_bandpass_filter_cached(spectrum, low_freq, high_freq)
-                
-                st.subheader("Frequency Filtered Image")
-                st.image(freq_filtered_image, use_column_width=True)
-                st.write(f"Original size: {get_file_size(original_image):.2f} KB")
-                st.write(f"New size (after frequency filtering): {get_file_size(freq_filtered_image):.2f} KB")
-    else:
-        st.info("Please upload an image to begin.")
+        with col2:
+            small_subheader("Frequency Domain Filter")
+            st.write("Custom Frequency Range (Bandpass)")
+            low_freq, high_freq = st.slider("Frequency Range", 0.0, 1.0, (0.0, 1.0), 0.01)
+            
+            # Apply frequency filter
+            freq_filtered_image = apply_bandpass_filter_cached(spectrum, low_freq, high_freq)
+            
+            st.subheader("Frequency Filtered Image")
+            st.image(freq_filtered_image, use_column_width=True)
+            st.write(f"Original size: {get_file_size(original_image):.2f} KB")
+            st.write(f"New size (after frequency filtering): {get_file_size(freq_filtered_image):.2f} KB")
