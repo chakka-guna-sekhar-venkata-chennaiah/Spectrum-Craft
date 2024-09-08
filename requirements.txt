@@ -1,0 +1,9 @@
+dash
+plotly
+numpy
+pillow
+dash-bootstrap-components
+pandas
+taipy
+streamlit
+matplotlib
