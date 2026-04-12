@@ -30,7 +30,11 @@ def compute_spectrum(image):
 def reconstruct_image(spectrum):
     img_back = np.fft.ifft2(np.fft.ifftshift(spectrum))
     img_back = np.abs(img_back)
-    return (img_back - np.min(img_back)) / (np.max(img_back) - np.min(img_back))
+    min_val = np.min(img_back)
+    max_val = np.max(img_back)
+    if max_val - min_val == 0:
+        return np.zeros_like(img_back)
+    return (img_back - min_val) / (max_val - min_val)
 
 def plot_spectrum(spectrum):
     magnitude_spectrum = np.log(np.abs(spectrum) + 1)
@@ -40,20 +44,21 @@ def plot_spectrum(spectrum):
     return fig
 
 def get_file_size(image):
+    # image is a float [0,1] array; convert safely
+    arr = (np.clip(image, 0, 1) * 255).astype(np.uint8)
     with io.BytesIO() as output:
-        Image.fromarray((image * 255).astype(np.uint8)).save(output, format="PNG")
+        Image.fromarray(arr).save(output, format="PNG")
         return len(output.getvalue()) / 1024  # Size in KB
 
 def apply_bandpass_filter(spectrum, low_freq, high_freq):
     rows, cols = spectrum.shape
     crow, ccol = rows // 2, cols // 2
-    mask = np.zeros((rows, cols), np.uint8)
+    mask = np.zeros((rows, cols), dtype=np.float64)
     r_outer = int(high_freq * min(crow, ccol))
     r_inner = int(low_freq * min(crow, ccol))
-    center = [crow, ccol]
     x, y = np.ogrid[:rows, :cols]
-    mask_area = np.logical_and(((x - center[0])**2 + (y - center[1])**2 >= r_inner**2),
-                               ((x - center[0])**2 + (y - center[1])**2 <= r_outer**2))
+    dist_sq = (x - crow) ** 2 + (y - ccol) ** 2
+    mask_area = (dist_sq >= r_inner ** 2) & (dist_sq <= r_outer ** 2)
     mask[mask_area] = 1
     return spectrum * mask
 
@@ -67,7 +72,7 @@ heading_styles = '''
             font-size: 48px;
             text-align: center;
             animation: glowing 2s infinite;
-            color: #FF5733; /* Orange color */
+            color: #FF5733;
             text-shadow: 2px 2px 4px #333;
         }
 
@@ -77,32 +82,32 @@ heading_styles = '''
             text-align: center;
             animation: colorChange 4s infinite;
             text-shadow: 1px 1px 2px #333;
-            color: #0099CC; /* Blue color */
+            color: #0099CC;
         }
 
         @keyframes glowing {
-            0% { color: #FF5733; } /* Orange color */
-            25% { color: #FFFFFF; } /* White color */
-            50% { color: #128807; } /* Green color */
-            75% { color: #0000FF; } /* Blue color */
-            100% { color: #FF5733; } /* Orange color */
+            0%   { color: #FF5733; }
+            25%  { color: #FFFFFF; }
+            50%  { color: #128807; }
+            75%  { color: #0000FF; }
+            100% { color: #FF5733; }
         }
 
         @keyframes colorChange {
-            0% { color: #0099CC; } /* Blue color */
-            25% { color: #FF5733; } /* Orange color */
-            50% { color: #66FF66; } /* Light Green color */
-            75% { color: #FFCC00; } /* Yellow color */
-            100% { color: #0099CC; } /* Blue color */
+            0%   { color: #0099CC; }
+            25%  { color: #FF5733; }
+            50%  { color: #66FF66; }
+            75%  { color: #FFCC00; }
+            100% { color: #0099CC; }
         }
     </style>
 '''
 
 st.markdown(heading_styles, unsafe_allow_html=True)
-st.markdown(f'<p class="glowing-heading">📊 SpectrumCraft 📊</p>', unsafe_allow_html=True)
-st.markdown(f'<p class="sub-heading">Custom Filters & Frequency Tuning</p>', unsafe_allow_html=True)
+st.markdown('<p class="glowing-heading">📊 SpectrumCraft 📊</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-heading">Custom Filters & Frequency Tuning</p>', unsafe_allow_html=True)
 
-# Create a sidebar for navigation
+# Sidebar navigation
 page = st.sidebar.selectbox("Choose a page", ["About", "How to Use", "Main Application"])
 
 if page == "About":
@@ -126,10 +131,14 @@ if page == "About":
 
 elif page == "How to Use":
     st.write("Watch the tutorial video below to learn how to use SpectrumCraft:")
-    video_file = open("reference.mp4", "rb")
-    video_bytes = video_file.read()
-    st.video(video_bytes)
-    
+    try:
+        video_file = open("reference.mp4", "rb")
+        video_bytes = video_file.read()
+        video_file.close()
+        st.video(video_bytes)
+    except FileNotFoundError:
+        st.warning("Tutorial video (reference.mp4) not found. Please add it to the project directory.")
+
     st.write("""
     1. Upload an image using the file uploader
     2. Observe the original image, its spectrum, and reconstructed version
@@ -140,7 +149,7 @@ elif page == "How to Use":
 
 elif page == "Main Application":
     st.header("SpectrumCraft Main Application")
-    
+
     @st.cache_data
     def apply_bandpass_filter_cached(spectrum, low_freq, high_freq):
         filtered_spectrum = apply_bandpass_filter(spectrum, low_freq, high_freq)
@@ -152,24 +161,30 @@ elif page == "Main Application":
     if uploaded_file is not None:
         image_bytes = uploaded_file.read()
         original_image = process_image(image_bytes)
+
+        # Normalise original to float [0,1] for consistent display & size reporting
+        original_float = original_image.astype(np.float64) / 255.0
+
         spectrum = compute_spectrum(original_image)
-        
+
         col1, col2, col3 = st.columns(3)
-        
+
         with col1:
             small_subheader("Original Image")
-            st.image(original_image, width=True)
-            st.caption(f"Memory usage: {get_file_size(original_image):.2f} KB")
+            # Pass uint8 array — st.image handles it cleanly without width issues
+            st.image(original_image, use_container_width=True)
+            st.caption(f"Memory usage: {get_file_size(original_float):.2f} KB")
 
         with col2:
             small_subheader("Magnitude Spectrum")
             fig = plot_spectrum(spectrum)
             st.pyplot(fig)
+            plt.close(fig)
 
         with col3:
             small_subheader("Reconstructed Image")
             reconstructed = reconstruct_image(spectrum)
-            st.image(reconstructed, width=True)
+            st.image(reconstructed, use_container_width=True)
             st.caption(f"Memory usage: {get_file_size(reconstructed):.2f} KB")
 
         st.info("""
@@ -179,9 +194,10 @@ elif page == "Main Application":
             1. Numerical precision limitations in computations
             2. Rounding errors in the Fourier transform and inverse transform processes
             3. Potential loss of information in the phase component
-            
+
             These factors can introduce small artifacts or noise in the reconstructed image, even when using all available frequency information.
             """)
+
         col1, col2 = st.columns(2)
 
         with col1:
@@ -191,25 +207,39 @@ elif page == "Main Application":
             filter_matrix = np.ones((filter_size, filter_size))
             filter_df = pd.DataFrame(filter_matrix)
             edited_filter_df = st.data_editor(filter_df, num_rows="dynamic")
-            
+
             if st.button("Apply Spatial Filter"):
-                edited_filter = edited_filter_df.to_numpy()
-                full_size_filter = np.zeros_like(original_image, dtype=float)
-                center = np.array(full_size_filter.shape) // 2
-                start = center - np.array(edited_filter.shape) // 2
-                end = start + np.array(edited_filter.shape)
-                full_size_filter[start[0]:end[0], start[1]:end[1]] = edited_filter
-                
+                edited_filter = edited_filter_df.to_numpy().astype(np.float64)
+
+                # Build a full-size filter mask centred in the image
+                full_size_filter = np.zeros(original_image.shape, dtype=np.float64)
+                crow, ccol = np.array(full_size_filter.shape) // 2
+                fh, fw = edited_filter.shape
+                r_start = crow - fh // 2
+                c_start = ccol - fw // 2
+                r_end = r_start + fh
+                c_end = c_start + fw
+
+                # Clamp to valid bounds
+                r_start = max(r_start, 0)
+                c_start = max(c_start, 0)
+                r_end = min(r_end, full_size_filter.shape[0])
+                c_end = min(c_end, full_size_filter.shape[1])
+
+                ef_r = r_end - r_start
+                ef_c = c_end - c_start
+                full_size_filter[r_start:r_end, c_start:c_end] = edited_filter[:ef_r, :ef_c]
+
                 filtered_spectrum = spectrum * full_size_filter
                 spatial_filtered_image = reconstruct_image(filtered_spectrum)
-                
+
                 st.session_state.spatial_filtered_image = spatial_filtered_image
-                st.session_state.spatial_original_size = get_file_size(original_image)
+                st.session_state.spatial_original_size = get_file_size(original_float)
                 st.session_state.spatial_new_size = get_file_size(spatial_filtered_image)
 
             if 'spatial_filtered_image' in st.session_state:
                 st.subheader("Spatially Filtered Image")
-                st.image(st.session_state.spatial_filtered_image, width=True)
+                st.image(st.session_state.spatial_filtered_image, use_container_width=True)
                 st.write(f"Original size: {st.session_state.spatial_original_size:.2f} KB")
                 st.write(f"New size (after spatial filtering): {st.session_state.spatial_new_size:.2f} KB")
 
@@ -217,11 +247,10 @@ elif page == "Main Application":
             small_subheader("Frequency Domain Filter")
             st.write("Custom Frequency Range (Bandpass)")
             low_freq, high_freq = st.slider("Frequency Range", 0.0, 1.0, (0.0, 1.0), 0.01)
-            
-            # Apply frequency filter
+
             freq_filtered_image = apply_bandpass_filter_cached(spectrum, low_freq, high_freq)
-            
+
             st.subheader("Frequency Filtered Image")
-            st.image(freq_filtered_image, width=True)
-            st.write(f"Original size: {get_file_size(original_image):.2f} KB")
+            st.image(freq_filtered_image, use_container_width=True)
+            st.write(f"Original size: {get_file_size(original_float):.2f} KB")
             st.write(f"New size (after frequency filtering): {get_file_size(freq_filtered_image):.2f} KB")
