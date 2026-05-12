@@ -570,10 +570,33 @@ elif page == "5 – Frequency Bandpass":
     spectrum = forward_fft(image)
     mag = magnitude_spectrum(spectrum)
 
-    lo, hi = st.slider(
+    # Preset buttons write to a non-widget key; the slider reads it as default
+    if "bp_lo" not in st.session_state:
+        st.session_state.bp_lo = 0
+        st.session_state.bp_hi = 100
+
+    def _set_bp(lo_val, hi_val):
+        st.session_state.bp_lo = lo_val
+        st.session_state.bp_hi = hi_val
+
+    # Quick presets (placed above the slider so they update it on next render)
+    st.markdown("**Quick presets:**")
+    pc1, pc2, pc3, pc4 = st.columns(4)
+    pc1.button("Low-pass (0–30%)",  on_click=_set_bp, args=(0, 30))
+    pc2.button("High-pass (30–100%)", on_click=_set_bp, args=(30, 100))
+    pc3.button("Mid-band (20–60%)", on_click=_set_bp, args=(20, 60))
+    pc4.button("All (0–100%)",      on_click=_set_bp, args=(0, 100))
+
+    bp_values = st.slider(
         "Frequency range (inner → outer, % of max)",
-        0, 100, (0, 100), 1, key="bp_range"
+        0, 100,
+        (st.session_state.bp_lo, st.session_state.bp_hi),
+        1,
     )
+    lo, hi = bp_values
+    # Keep state in sync when the user drags the slider manually
+    st.session_state.bp_lo = lo
+    st.session_state.bp_hi = hi
 
     mask = bandpass_mask(image.shape, lo / 100, hi / 100)
     filtered = spectrum * mask
@@ -605,18 +628,6 @@ elif page == "5 – Frequency Bandpass":
     m2.metric("Energy retained", f"{eng:.1f}%")
     m3.metric("PSNR", f"{quality:.1f} dB" if quality < 200 else "∞")
     m4.metric("PNG size", f"{png_kb(recon):.1f} KB")
-
-    # Quick presets
-    st.markdown("**Quick presets:**")
-    pc1, pc2, pc3, pc4 = st.columns(4)
-    if pc1.button("Low-pass (0–30%)"):
-        st.session_state["bp_range"] = (0, 30); st.rerun()
-    if pc2.button("High-pass (30–100%)"):
-        st.session_state["bp_range"] = (30, 100); st.rerun()
-    if pc3.button("Mid-band (20–60%)"):
-        st.session_state["bp_range"] = (20, 60); st.rerun()
-    if pc4.button("All (0–100%)"):
-        st.session_state["bp_range"] = (0, 100); st.rerun()
 
 
 # ══════════════════════════════════════════════
