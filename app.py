@@ -32,11 +32,65 @@ st.markdown("""
         font-size: 0.85rem; font-weight: 600; color: #f59e42;
         letter-spacing: 0.5px; margin-bottom: 4px;
     }
+
+    /* ── Animated glyph heading ── */
+    .glyph-heading {
+        font-size: 1.35rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin: 1.6rem 0 0.6rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0px;
+    }
+    .glyph-heading .glyph {
+        display: inline-block;
+        color: #888;
+        animation: glyphPulse 3s ease-in-out infinite;
+        text-shadow: 0 0 4px transparent;
+    }
+    .glyph-heading .glyph-space { width: 0.35em; }
+
+    @keyframes glyphPulse {
+        0%, 100% {
+            color: #555;
+            text-shadow: 0 0 2px transparent;
+        }
+        30% {
+            color: #f59e42;
+            text-shadow: 0 0 8px rgba(245,158,66,0.7),
+                         0 0 16px rgba(245,158,66,0.3);
+        }
+        60% {
+            color: #c74bdb;
+            text-shadow: 0 0 8px rgba(199,75,219,0.7),
+                         0 0 16px rgba(199,75,219,0.3);
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
 st.markdown('<p class="main-title">📊 SpectrumCraft</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-title">Understand how frequencies build images</p>', unsafe_allow_html=True)
+
+
+def glyph_heading(text):
+    """Render a heading where each character lights up with a staggered glow."""
+    spans = []
+    char_idx = 0
+    for ch in text:
+        if ch == " ":
+            spans.append('<span class="glyph-space"></span>')
+        else:
+            delay = round(char_idx * 0.09, 2)
+            spans.append(
+                f'<span class="glyph" style="animation-delay:{delay}s">{ch}</span>'
+            )
+            char_idx += 1
+    st.markdown(
+        f'<div class="glyph-heading">{"".join(spans)}</div>',
+        unsafe_allow_html=True,
+    )
 
 
 # ──────────────────────────────────────────────
@@ -634,9 +688,9 @@ elif page == "5 – Frequency Bandpass":
 # PAGE 6 – HOW IT WORKS
 # ══════════════════════════════════════════════
 elif page == "6 – How It Works":
-    st.header("How It Works")
+    glyph_heading("How It Works")
 
-    st.subheader("1 – What is the Fourier Transform?")
+    glyph_heading("1 — What is the Fourier Transform?")
     st.write(
         "Any signal — audio, image, anything — can be decomposed into a sum of "
         "pure sine/cosine waves.  The Fourier Transform tells you *which* "
@@ -645,7 +699,7 @@ elif page == "6 – How It Works":
         "diagonal) at every possible spatial frequency."
     )
 
-    st.subheader("2 – The Magnitude Spectrum")
+    glyph_heading("2 — The Magnitude Spectrum")
     st.write(
         "The bright dot at the center = DC component (average brightness).  "
         "Moving outward = higher frequencies = finer detail.  Bright spots far "
@@ -653,7 +707,7 @@ elif page == "6 – How It Works":
         "stripes in the image produce horizontal bright dots in the spectrum."
     )
 
-    st.subheader("3 – Phase Matters More Than You'd Think")
+    glyph_heading("3 — Phase Matters More Than You'd Think")
     st.write(
         "The spectrum has two parts: magnitude (strength) and phase (position "
         "of each wave).  Most visual structure lives in the phase.  Swapping "
@@ -661,7 +715,7 @@ elif page == "6 – How It Works":
         "donated its phase — see the Phase vs Magnitude page."
     )
 
-    st.subheader("4 – The Window / Filtering Concept")
+    glyph_heading("4 — The Window / Filtering Concept")
     st.write(
         "Imagine a circular window at the center of the spectrum.  Keep only "
         "what's inside → low-pass filter → blurry but recognisable.  Keep only "
@@ -670,7 +724,7 @@ elif page == "6 – How It Works":
         "high frequencies your eye can't distinguish."
     )
 
-    st.subheader("5 – Spatial vs Frequency Filtering")
+    glyph_heading("5 — Spatial vs Frequency Filtering")
     st.write(
         "Spatial filtering (convolution) slides a small kernel across pixels.  "
         "Frequency filtering multiplies a mask in the spectrum.  They are "
@@ -679,7 +733,7 @@ elif page == "6 – How It Works":
         "it called frequency-domain masking 'spatial filtering'."
     )
 
-    st.subheader("6 – Why You Can't Generate Novel Images This Way")
+    glyph_heading("6 — Why You Can't Generate Novel Images This Way")
     st.write(
         "Every possible NxN image is some unique combination of N² frequencies.  "
         "But the space of all combinations is astronomically vast, and the "
@@ -689,7 +743,7 @@ elif page == "6 – How It Works":
         "frequency recipes correspond to real-world content."
     )
 
-    st.subheader("7 – The Math (Simplified)")
+    glyph_heading("7 — The Math (Simplified)")
     st.latex(r"F(u,v) = \sum_{x}\sum_{y} f(x,y)\, e^{-j2\pi(ux/M + vy/N)}")
     st.write(
         "For each frequency (u, v), multiply every pixel by a corresponding "
@@ -697,7 +751,7 @@ elif page == "6 – How It Works":
         "rebuild the image."
     )
 
-    st.subheader("8 – Real-World Uses of FFT")
+    glyph_heading("8 — Real-World Uses of FFT")
     st.write(
         "JPEG/HEIF compression, image denoising, edge detection, texture "
         "analysis, MRI reconstruction (MRI scanners directly capture frequency "
